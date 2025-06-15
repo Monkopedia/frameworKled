@@ -6,7 +6,13 @@ group = "com.monkopedia"
 version = "1.0"
 
 kotlin {
-    linuxX64()
+    linuxX64 {
+        binaries {
+            executable {
+                entryPoint = "com.monkopedia.frameworkled.main"
+            }
+        }
+    }
 }
 
 repositories {

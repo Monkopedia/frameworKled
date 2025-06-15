@@ -1,0 +1,55 @@
+@file:OptIn(ExperimentalForeignApi::class)
+package com.monkopedia.frameworkled
+
+import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.convert
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.pointed
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.sizeOf
+import platform.posix.B115200
+import platform.posix.ICANON
+import platform.posix.STDIN_FILENO
+import platform.posix.TCSANOW
+import platform.posix.cfsetspeed
+import platform.posix.memcpy
+import platform.posix.tcgetattr
+import platform.posix.tcsetattr
+import platform.posix.termios
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
+
+@OptIn(ExperimentalContracts::class)
+inline fun withoutIcanon(fd: Int = STDIN_FILENO, callback: () -> Unit) {
+    contract {
+        callsInPlace(callback, InvocationKind.EXACTLY_ONCE)
+    }
+    memScoped {
+        val old = alloc<termios>()
+        initTermios(fd, old.ptr)
+        callback()
+        resetTermios(fd, old.ptr)
+    }
+}
+
+fun initTermios(fd: Int = STDIN_FILENO, old: CPointer<termios>) {
+    memScoped {
+        val current = alloc<termios>().ptr
+        tcgetattr(fd, old)
+        memcpy(current, old, sizeOf<termios>().toULong())
+        current.pointed.setICanon()
+        cfsetspeed(current, B115200.convert())
+        tcsetattr(fd, TCSANOW, current)
+    }
+}
+
+fun termios.setICanon() {
+    c_lflag = c_lflag and ICANON.inv().toUInt()
+}
+
+fun resetTermios(fd: Int = STDIN_FILENO, old: CPointer<termios>) {
+    tcsetattr(fd, TCSANOW, old)
+}
